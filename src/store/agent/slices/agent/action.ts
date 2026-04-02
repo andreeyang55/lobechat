@@ -1,27 +1,29 @@
+import { type AgentContextDocument } from '@lobechat/context-engine';
 import { isChatGroupSessionId } from '@lobechat/types';
 import { getSingletonAnalyticsOptional } from '@lobehub/analytics';
 import isEqual from 'fast-deep-equal';
 import { produce } from 'immer';
-import { type SWRResponse } from 'swr';
-import { type PartialDeep } from 'type-fest';
+import type { SWRResponse } from 'swr';
+import type { PartialDeep } from 'type-fest';
 
 import { MESSAGE_CANCEL_FLAT } from '@/const/message';
-import { mutate, useClientDataSWR } from '@/libs/swr';
-import { type CreateAgentParams, type CreateAgentResult } from '@/services/agent';
+import { mutate, useClientDataSWR, useClientDataSWRWithSync } from '@/libs/swr';
+import type { CreateAgentParams, CreateAgentResult } from '@/services/agent';
 import { agentService } from '@/services/agent';
-import { type StoreSetter } from '@/store/types';
+import {
+  agentDocumentService,
+  agentDocumentSWRKeys,
+  mapAgentDocumentsToContext,
+} from '@/services/agentDocument';
+import type { StoreSetter } from '@/store/types';
 import { getUserStoreState } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
-import {
-  type LobeAgentChatConfig,
-  type LobeAgentConfig,
-  type RuntimeEnvConfig,
-} from '@/types/agent';
-import { type MetaData } from '@/types/meta';
+import type { LobeAgentChatConfig, LobeAgentConfig, RuntimeEnvConfig } from '@/types/agent';
+import type { MetaData } from '@/types/meta';
 import { merge } from '@/utils/merge';
 
-import { type AgentStore } from '../../store';
-import { type AgentSliceState, type LoadingState, type SaveStatus } from './initialState';
+import type { AgentStore } from '../../store';
+import type { AgentSliceState, LoadingState, SaveStatus } from './initialState';
 
 const FETCH_AGENT_CONFIG_KEY = 'FETCH_AGENT_CONFIG';
 
@@ -248,6 +250,31 @@ export class AgentSliceActionImpl {
 
           this.#set({ activeAgentId: data.id }, false, 'fetchAgentConfig');
         },
+      },
+    );
+  };
+
+  useFetchAgentDocuments = (agentId?: string | null): SWRResponse<AgentContextDocument[]> => {
+    return useClientDataSWRWithSync<AgentContextDocument[]>(
+      agentId ? agentDocumentSWRKeys.documents(agentId) : null,
+      async () =>
+        mapAgentDocumentsToContext(await agentDocumentService.getDocuments({ agentId: agentId! })),
+      {
+        onData: (data) => {
+          if (!agentId) return;
+
+          this.#set(
+            (state) => ({
+              agentDocumentsMap: {
+                ...state.agentDocumentsMap,
+                [agentId]: data,
+              },
+            }),
+            false,
+            'useFetchAgentDocuments/success',
+          );
+        },
+        revalidateOnFocus: false,
       },
     );
   };

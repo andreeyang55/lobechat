@@ -19,6 +19,7 @@ import { ModelProvider } from 'model-bank';
 
 import { DEFAULT_AGENT_CONFIG } from '@/const/settings';
 import { getSearchConfig } from '@/helpers/getSearchConfig';
+import { resolveAgentDocumentsContext } from '@/services/agentDocument';
 import { getAgentStoreState } from '@/store/agent';
 import {
   agentByIdSelectors,
@@ -156,6 +157,10 @@ class ChatService {
     // which is stored in chatStore.activeAgentId, not the targetAgentId (which is the Agent Builder itself)
     const isAgentBuilderEnabled = enabledToolIds.includes(AgentBuilderIdentifier);
     let agentBuilderContext;
+    const agentDocuments = await resolveAgentDocumentsContext({
+      agentId: targetAgentId,
+      cachedDocuments: agentSelectors.getAgentDocumentsById(targetAgentId)(getAgentStoreState()),
+    });
 
     if (isAgentBuilderEnabled) {
       const activeAgentId = getChatStoreState().activeAgentId || '';
@@ -242,6 +247,7 @@ class ChatService {
     // Note: agentConfig.systemRole is already resolved by resolveAgentConfig for builtin agents
     const modelMessages = await contextEngineering({
       agentBuilderContext,
+      agentDocuments,
       agentId: targetAgentId,
       // Use raw chatConfig values, not selectors with business logic that may force false
       enableHistoryCount: chatConfig.enableHistoryCount,
