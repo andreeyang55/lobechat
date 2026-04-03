@@ -78,11 +78,15 @@ export const checkAuth =
         };
       }
 
-      if (!isUseOidcAuth)
-        checkAuthMethod({
-          apiKey: jwtPayload.apiKey,
-          betterAuthAuthorized,
-        });
+      if (!isUseOidcAuth) {
+        checkAuthMethod({ betterAuthAuthorized });
+
+        // When authenticated via session, always use the server-validated userId
+        // instead of trusting the client-supplied XOR header payload.
+        if (betterAuthAuthorized) {
+          jwtPayload = { ...jwtPayload, userId: session!.user!.id };
+        }
+      }
     } catch (e) {
       const params = await options.params;
 
